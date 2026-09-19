@@ -1,0 +1,75 @@
+// TV Nova support agent — the actual hackathon submission, not a showcase
+// file like the others in this folder.
+//
+// Verifies the caller by email against a subscriber record before answering
+// anything account-specific, then logs a ticket summarizing the call. The
+// two tools below point at a free public mock API (jsonplaceholder.typicode.com)
+// standing in for TV Nova's real subscriber system and ticketing system —
+// swap the two "http.url" values for real endpoints later, nothing else
+// about this file needs to change.
+//
+// Built for the AssemblyAI Voice Agent Hackathon (lablab.ai, Sep 1-30 2026).
+// Try it: say an email from https://jsonplaceholder.typicode.com/users
+// (e.g. Sincere@april.biz), then ask about your plan.
+//
+// https://www.assemblyai.com/docs/voice-agents/voice-agent-api/tools/http-tools
+{
+  "name": "TV Nova Support",
+
+  "system_prompt": "You answer the phone for TV Nova, a pay-TV subscription service. Start by asking for the email address on their account, then call verify_subscriber before answering anything account-specific. If it finds them, greet them by name and answer only from what came back. If it finds nobody, say you could not find an account with that email and ask them to check it, or offer to log the issue for a human to follow up. Never invent account, plan, or billing details that did not come back from verify_subscriber. Before the call ends, call log_ticket once with a short summary of what the caller needed. Keep replies to one or two sentences, lead with the answer, and skip the preamble. No exclamation marks.",
+
+  "greeting": "Hi! Welcome to TV Nova support. How can I help you today?",
+
+  "voice": { "voice_id": "anna" },
+
+  "input": {
+    // Bias transcription toward the one word a generic model would
+    // otherwise mishear or guess at.
+    "keyterms": ["TV Nova"]
+  },
+
+  "tools": [
+    {
+      "name": "verify_subscriber",
+      "description": "Look up a TV Nova subscriber by the email on their account. Call this before answering any account-specific question, right after the caller gives their email.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "description": "The email address on the subscriber's account, exactly as they say it." }
+        },
+        "required": ["email"]
+      },
+      "execution_mode": "hold",
+      "timeout_seconds": 15,
+      "http": {
+        // GET; "email" is added to the query string on top of this, same
+        // mechanism as get_weather in http-tools.jsonc. Stand-in for TV
+        // Nova's real subscriber lookup.
+        "url": "https://jsonplaceholder.typicode.com/users",
+        "http_method": "GET"
+      }
+    },
+    {
+      "name": "log_ticket",
+      "description": "File a support ticket summarizing this call. Call once, near the end, after the account issue has been identified, whether or not it was resolved.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "Short ticket title, a few words." },
+          "body": { "type": "string", "description": "One or two sentences: what the subscriber needed and what was done or still needs follow-up." },
+          "userId": { "type": "number", "description": "The subscriber's id from verify_subscriber. Use 0 if no account was found." }
+        },
+        "required": ["title", "body"]
+      },
+      "execution_mode": "interactive",
+      "timeout_seconds": 15,
+      "http": {
+        // POST; stand-in for TV Nova's real ticketing system. jsonplaceholder
+        // fakes a 201 with an id back, it does not really persist — enough
+        // to prove the call happens correctly.
+        "url": "https://jsonplaceholder.typicode.com/posts",
+        "http_method": "POST"
+      }
+    }
+  ]
+}
